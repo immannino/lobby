@@ -1,0 +1,20 @@
+{{ define "index" }}
+    {{ template "top" }}
+    <main>
+        <h1>Home</h1>
+        <p>Create or Join a session</p>
+        <form action="/join">
+            <label for="Code">Code</label>
+            <input id="Code" name="Code" type="text" maxlength="4">
+
+            <label for="Name">Name</label>
+            <input id="Name" name="Name" type="text" maxlength="20">
+
+            <input type="submit" value="Join">
+        </form>
+        <form action="/create">
+            <input type="submit" value="Create">
+        </form>
+    </main>
+    {{ template "bottom" }}
+{{ end }}
