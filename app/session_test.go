@@ -12,8 +12,10 @@ func Test_Integration(t *testing.T) {
 	url := "http://localhost:1234"
 	c := http.Client{}
 
+	name := "Test"
+
 	// Create a session
-	res, err := c.Post(url+"/create", "application/json", nil)
+	res, err := c.Post(url+"/create?name="+name, "application/json", nil)
 	assert.NoError(t, err)
 
 	var s *GameSession
@@ -23,23 +25,26 @@ func Test_Integration(t *testing.T) {
 	var sessions map[string]*GameSession
 	res, err = c.Get(url + "/sessions")
 	assert.NoError(t, err)
-
-	err = json.NewDecoder(res.Body).Decode(&sessions)
-	assert.NoError(t, err)
-	assert.Contains(t, sessions, s.Code)
-
-	name := "Test"
-
-	res, err = c.Get(url + "/" + s.Code + "/join?Name=" + name)
-	assert.NoError(t, err)
-
-	res, err = c.Get(url + "/sessions")
-	assert.NoError(t, err)
 	err = json.NewDecoder(res.Body).Decode(&sessions)
 	assert.NoError(t, err)
 	PrettyJson(sessions)
+	assert.Contains(t, sessions, s.Code)
 	assert.Contains(t, sessions[s.Code].Players, name)
 
-	res, err = c.Get(url + "/" + s.Code + "/join?Name=" + name)
-	assert.ErrorContains(t, err, "foo")
+	res, err = c.Get(url + "/" + s.Code + "/join?name=" + name)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotAcceptable, res.StatusCode)
+
+	name = "test2"
+	res, err = c.Get(url + "/" + s.Code + "/join?name=" + name)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+
+	res, err = c.Get(url + "/" + "f" + "/join?name=" + name)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, res.StatusCode)
+
+	res, err = c.Get(url + "/" + "1111" + "/join?name=" + name)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusNotFound, res.StatusCode)
 }

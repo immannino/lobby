@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	sessions = map[string]*GameSession{}
+	Sessions = map[string]*GameSession{}
 )
 
 type GameSession struct {
@@ -47,13 +47,13 @@ func CreateSession() *GameSession {
 		Updated: time.Now(),
 	}
 
-	sessions[s.Code] = s
+	Sessions[s.Code] = s
 
 	return s
 }
 
 func CloseSession(code string) {
-	delete(sessions, code)
+	delete(Sessions, code)
 }
 
 func newCode() (code string) {
