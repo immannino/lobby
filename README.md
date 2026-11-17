@@ -31,7 +31,7 @@ go get github.com/immannino/lobby
 | `lobbytest/` | Test helpers: play your game with in-process clients and assert on your own Go types. |
 | `examples/games/` | Example games, each a package with its own browser module: `chat`, `tictactoe`, `connect4`, `hangman`, plus the shared `duel` (two-player, winner stays on) and `botkit` (computer players over `LocalConn`). |
 | `examples/quickstart/` | A complete buzzer game in ~35 lines of Go. Start here. |
-| `examples/site/` | The website: landing page, docs (`/docs`) and a live demo (`/play`) of all the example games. Built from the root `Dockerfile`. |
+| `examples/site/` | The website: landing page, docs (`/docs`) and a live demo (`/play`) of all the example games. |
 | `docs/storage.md` | In-memory vs. SQLite vs. Postgres/MySQL, with schemas. |
 | `docs/roadmap.md` | Production-readiness checklist, benchmarks, site, quickstarts. |
 | `AGENTS.md` | A guide for AI coding agents building on the library. |
@@ -178,24 +178,6 @@ numbers include the clients' own read cost in the same process.
 
 A broadcast is JSON-encoded once, no matter how many clients receive it. See
 [docs/roadmap.md](docs/roadmap.md#benchmarking) for what to measure next.
-
-## Deploying (Railway)
-
-The root `Dockerfile` builds the site into a 13 MB distroless image. It
-listens on `$PORT` and stores rooms in `$LOBBY_DB` (default `/data/lobby.db`).
-
-1. New service → deploy from the GitHub repo. Railway picks up the Dockerfile.
-2. Add a **volume** mounted at `/data`, so rooms survive deploys. A volume also
-   turns off overlapping deploys, which is what you want: one process owns all
-   rooms.
-3. Set variables: `LOBBY_PROXY_HEADER=X-Real-IP` and
-   `LOBBY_SECURE_COOKIES=true`.
-4. Set the health check path to `/healthz`. It returns `Manager.Stats()` as
-   JSON.
-
-On redeploy the server gets `SIGTERM`. It saves every room and closes sockets
-with "going away", so phones reconnect to the new deployment and keep their
-seats.
 
 ## Limits
 

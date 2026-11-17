@@ -36,7 +36,7 @@
 <li><a href="#browser">Browser client</a></li>
 <li><a href="#test">Testing</a></li>
 <li><a href="#persist">Persistence</a></li>
-<li><a href="#deploy">Deploying</a></li>
+<li><a href="#production">Running in production</a></li>
 <li><a href="#config">Configuration</a></li>
 <li><a href="#protocol">Wire protocol</a></li>
 <li><a href="#agents">Using with AI agents</a></li>
@@ -169,17 +169,16 @@ if err := m.Restore(ctx); err != nil { ... }   // at startup
 defer m.Shutdown(ctx)                           // persists rooms, tells clients to reconnect</code></pre>
 <p>For Postgres or MySQL, implement the three-method <code>lobby.Store</code> interface. See <a href="https://github.com/immannino/lobby/blob/main/docs/storage.md">docs/storage.md</a>.</p>
 </section>
-<section id="deploy">
-<h2>Deploying</h2>
-<p>lobby is one Go binary. Put it behind any HTTPS proxy, and keep two things in mind. Don't set <code>http.Server.WriteTimeout</code>, because it kills websockets. Run a single instance, because rooms live in that process's memory.</p>
-<h3>Railway</h3>
-<ol>
-<li>Create a service from the GitHub repo. Railway builds the root <code>Dockerfile</code>, which builds this site.</li>
-<li>Add a volume mounted at <code>/data</code>. The image stores rooms in <code>/data/lobby.db</code>, so they survive deploys.</li>
-<li>Set variables: <code>LOBBY_PROXY_HEADER=X-Real-IP</code> (per-IP rate limits behind Railway's proxy) and <code>LOBBY_SECURE_COOKIES=true</code>.</li>
-<li>Set the health check path to <code>/healthz</code>. It returns live stats as JSON.</li>
-</ol>
-<p>Railway sends <code>SIGTERM</code> on redeploy. The server persists every room and tells clients "going away", so phones reconnect to the new deployment and keep their seats.</p>
+<section id="production">
+<h2>Running in production</h2>
+<p>Where and how you host your server is up to you. These are the parts of the library that interact with that choice:</p>
+<ul>
+<li><strong>Don't set <code>http.Server.WriteTimeout</code>.</strong> It kills long-lived websockets. Use <code>ReadHeaderTimeout</code> instead.</li>
+<li><strong>One process owns its rooms.</strong> Live connections are held in memory, so every request for a room code must reach the process hosting it.</li>
+<li><strong>Behind a reverse proxy</strong>, set <code>ClientIP</code> (for example <code>lobby.HeaderClientIP("X-Real-IP")</code>) so rate limits apply per client, not per proxy. Set <code>SecureCookies</code> when serving HTTPS, and <code>OriginPatterns</code> if pages on another origin connect.</li>
+<li><strong>Call <code>m.Shutdown(ctx)</code> on <code>SIGTERM</code>.</strong> It persists every room and closes sockets with "going away", so clients reconnect to the next process and keep their seats. Call <code>m.Restore(ctx)</code> at startup.</li>
+<li><strong>Monitor <code>m.Stats()</code></strong> for rooms, connections, messages, slow-client drops, rate limits and recovered panics.</li>
+</ul>
 </section>
 <section id="config">
 <h2>Configuration</h2>

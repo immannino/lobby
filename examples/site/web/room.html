@@ -30,9 +30,14 @@
   <header>
     <hgroup>
       <p>Join at <b data-join-url></b> with code</p>
-      <h1 data-code></h1>
+      <h1 data-code title="Click to copy"></h1>
       <p data-status></p>
     </hgroup>
+    <p data-invite>
+      <button type="button" data-copy="code">Copy code</button>
+        <button type="button" data-copy="link">Copy link</button>
+        <button type="button" data-share hidden>Share</button>
+    </p>
   </header>
   <main>
     <section data-cards>
@@ -47,7 +52,7 @@
 <!-- Phone: compact top bar; the game adds cards before Players -->
 <template id="player-view">
   <nav aria-label="Room">
-    <strong data-code></strong>
+    <strong data-code title="Tap to copy"></strong>
     <span><span data-you></span> <mark data-vip-tag hidden>VIP</mark></span>
     <button data-leave>Leave</button>
   </nav>
@@ -56,6 +61,12 @@
       <article data-players-card>
         <h2>Players <output data-player-count>0</output></h2>
         <ul data-players></ul>
+        <footer data-invite>
+          <span>Invite friends</span>
+          <button type="button" data-copy="code">Copy code</button>
+        <button type="button" data-copy="link">Copy link</button>
+        <button type="button" data-share hidden>Share</button>
+        </footer>
         <footer data-vip-controls hidden>
           <label><input type="checkbox" role="switch" data-lock> Lock room (stop new players joining)</label>
         </footer>
@@ -146,6 +157,7 @@
     for (const node of view.children) node.dataset.mounted = "";
     dialog.before(view);
 
+    wireInvite();
     if (role === "display") {
       $("[data-join-url]").textContent = location.host;
     } else {
@@ -176,6 +188,57 @@
     for (const [type, data] of pending) game.onMessage?.(type, data);
     pending = [];
     render();
+  }
+
+  // ---- Invite: copy the code or join link, or open the native share sheet ----
+  const joinLink = () => `${location.origin}/play?code=${code}`;
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text); // needs HTTPS or localhost
+      return true;
+    } catch {
+      // Plain-HTTP LAN addresses (phones testing a dev server) have no
+      // clipboard API; fall back to a hidden textarea.
+      const ta = el("textarea", { value: text, readOnly: true });
+      ta.style.cssText = "position:fixed;opacity:0;pointer-events:none";
+      document.body.append(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      ta.remove();
+      return ok;
+    }
+  }
+
+  function flash(btn, text) {
+    clearTimeout(btn.flashTimer);
+    btn.dataset.label ??= btn.textContent;
+    btn.textContent = text;
+    btn.flashTimer = setTimeout(() => (btn.textContent = btn.dataset.label), 1500);
+  }
+
+  function wireInvite() {
+    const canShare = typeof navigator.share === "function";
+    const touch = matchMedia("(pointer: coarse)").matches;
+    for (const btn of document.querySelectorAll("[data-copy]")) {
+      // On phones the share sheet already offers "copy link"; keep the
+      // button on laptops and TVs, where copying is the common case.
+      if (btn.dataset.copy === "link") btn.hidden = canShare && touch;
+      btn.onclick = async () => {
+        const ok = await copyText(btn.dataset.copy === "code" ? code : joinLink());
+        flash(btn, ok ? "Copied!" : "Couldn't copy");
+      };
+    }
+    for (const btn of document.querySelectorAll("[data-share]")) {
+      btn.hidden = !canShare;
+      btn.onclick = () =>
+        navigator.share({ title: "Join my game", text: `Join my game with code ${code}`, url: joinLink() }).catch(() => {}); // dismissed
+    }
+    for (const c of document.querySelectorAll("[data-code]")) {
+      c.onclick = async () => {
+        if (await copyText(code)) showBanner(`Copied ${code}`, 1500);
+      };
+    }
   }
 
   function render() {

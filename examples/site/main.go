@@ -4,7 +4,7 @@
 //
 //	go run ./examples/site -addr :1234 -db lobby.db
 //
-// Every flag can also be set from the environment, for hosts like Railway:
+// Every flag can also be set from the environment:
 // PORT, LOBBY_DB, LOBBY_PROXY_HEADER (e.g. X-Real-IP) and LOBBY_SECURE_COOKIES.
 package main
 
@@ -47,7 +47,7 @@ type options struct {
 
 func main() {
 	defaultAddr := ":1234"
-	if port := os.Getenv("PORT"); port != "" { // Railway, Fly, Heroku, Cloud Run...
+	if port := os.Getenv("PORT"); port != "" { // set by most hosting platforms
 		defaultAddr = ":" + port
 	}
 	var o options

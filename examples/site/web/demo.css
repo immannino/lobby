@@ -54,21 +54,22 @@ nav[data-themes] { justify-content: center; font-size: 0.875rem; }
 [data-duel][data-my-turn="yes"] [data-headline] { color: var(--y-accent); }
 [data-duel] [data-actions] { text-align: center; margin: 1.25rem 0 0; }
 [data-board] { display: grid; gap: 0.5rem; margin: 0 auto; }
-/* Selectors carry [data-cell] to outrank yearn's "button ~ button" secondary style. */
-[data-board] > button[data-cell] {
+/* yearn styles sibling buttons with :is(...) ~ :is(...), specificity (0,2,2).
+   Board and key selectors carry an extra attribute so they always outrank it. */
+[data-board] > button[data-cell]:not([hidden]) {
   aspect-ratio: 1; padding: 0; min-width: 0; letter-spacing: 0; text-transform: none;
   color: var(--y-text); background: var(--y-fill);
 }
-[data-board] > button[data-cell]:disabled { opacity: 1; cursor: default; } /* yearn dims disabled buttons; marks must stay crisp */
-[data-duel][data-my-turn="yes"] [data-board] > button[data-cell]:not(:disabled):hover { background: var(--y-fill-hover); }
+[data-board] > button[data-cell]:not([hidden]):disabled { opacity: 1; cursor: default; } /* yearn dims disabled buttons; marks must stay crisp */
+[data-duel][data-my-turn="yes"] [data-board] > button[data-cell]:not([hidden]):not(:disabled):hover { background: var(--y-fill-hover); }
 
 /* Tic-tac-toe */
 [data-board][data-grid="ttt"] { grid-template-columns: repeat(3, 1fr); max-width: 20rem; }
 body[data-role="display"] [data-board][data-grid="ttt"] { max-width: 26rem; }
-[data-grid="ttt"] > button[data-cell] { border-radius: var(--y-radius); font-family: var(--y-font-serif); font-size: clamp(2.5rem, 12vw, 4rem); }
-[data-grid="ttt"] > button[data-cell][data-mark="X"] { color: var(--y-accent); }
-[data-grid="ttt"] > button[data-cell][data-mark="O"] { color: var(--y-pink); }
-[data-grid="ttt"] > button[data-cell][data-win] { background: var(--y-highlight); }
+[data-board][data-grid="ttt"] > button[data-cell] { border-radius: var(--y-radius); font-family: var(--y-font-serif); font-size: clamp(2.5rem, 12vw, 4rem); }
+[data-board][data-grid="ttt"] > button[data-cell][data-mark="X"] { color: var(--y-accent); }
+[data-board][data-grid="ttt"] > button[data-cell][data-mark="O"] { color: var(--y-pink); }
+[data-board][data-grid="ttt"] > button[data-cell][data-win] { background: var(--y-highlight); }
 
 /* Connect 4: discs in a blue frame */
 [data-board][data-grid="c4"] {
@@ -76,12 +77,12 @@ body[data-role="display"] [data-board][data-grid="ttt"] { max-width: 26rem; }
   border-radius: var(--y-radius); background: var(--y-blue);
 }
 body[data-role="display"] [data-board][data-grid="c4"] { max-width: 34rem; }
-[data-grid="c4"] > button[data-cell] { border-radius: 50%; background: var(--y-bg); transition: background 0.15s; }
-[data-duel][data-my-turn="yes"] [data-grid="c4"] > button[data-cell]:not(:disabled):hover { background: var(--y-fill-hover); }
-[data-grid="c4"] > button[data-cell][data-disc="R"] { background: var(--y-red); }
-[data-grid="c4"] > button[data-cell][data-disc="Y"] { background: var(--y-yellow); }
-[data-grid="c4"] > button[data-cell][data-last] { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--y-bg) 60%, transparent); }
-[data-grid="c4"] > button[data-cell][data-win] { box-shadow: inset 0 0 0 4px var(--y-bg), 0 0 0 3px var(--y-ink); }
+[data-board][data-grid="c4"] > button[data-cell] { border-radius: 50%; background: var(--y-bg); transition: background 0.15s; }
+[data-duel][data-my-turn="yes"] [data-board][data-grid="c4"] > button[data-cell]:not(:disabled):hover { background: var(--y-fill-hover); }
+[data-board][data-grid="c4"] > button[data-cell][data-disc="R"] { background: var(--y-red); }
+[data-board][data-grid="c4"] > button[data-cell][data-disc="Y"] { background: var(--y-yellow); }
+[data-board][data-grid="c4"] > button[data-cell][data-last] { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--y-bg) 60%, transparent); }
+[data-board][data-grid="c4"] > button[data-cell][data-win] { box-shadow: inset 0 0 0 4px var(--y-bg), 0 0 0 3px var(--y-ink); }
 
 /* Hangman */
 [data-hangman] hgroup { margin: 0 0 1rem; text-align: center; }
@@ -96,9 +97,9 @@ body[data-role="display"] [data-hangman] svg[data-gallows] { width: min(16rem, 6
 [data-word] > span { min-width: 1.1em; text-align: center; border-bottom: 3px solid var(--y-stroke-strong); line-height: 1.2; }
 [data-word] > span[data-missed] { color: var(--y-danger); }
 [data-keys] { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.4rem, 1fr)); gap: 0.35rem; max-width: 26rem; margin: 0 auto; }
-[data-keys] > button[data-key] { padding: 0; height: 2.6rem; min-width: 0; letter-spacing: 0; font-family: var(--y-font-mono); color: var(--y-text); background: var(--y-fill); }
-[data-keys] > button[data-key][data-hit] { color: var(--y-on-accent); background: var(--y-success); opacity: 1; }
-[data-keys] > button[data-key][data-miss] { color: var(--y-text-3); background: var(--y-fill-subtle); text-decoration: line-through; opacity: 1; }
+[data-keys] > button[data-key]:not([hidden]) { padding: 0; height: 2.6rem; min-width: 0; letter-spacing: 0; font-family: var(--y-font-mono); color: var(--y-text); background: var(--y-fill); }
+[data-keys] > button[data-key]:not([hidden])[data-hit] { color: var(--y-on-accent); background: var(--y-success); opacity: 1; }
+[data-keys] > button[data-key]:not([hidden])[data-miss] { color: var(--y-text-3); background: var(--y-fill-subtle); text-decoration: line-through; opacity: 1; }
 [data-hangman] form { display: flex; gap: 0.5rem; max-width: 26rem; margin: 1rem auto 0; }
 [data-hangman] form input { flex: 1; font-family: var(--y-font-mono); text-transform: uppercase; }
 [data-hangman] [data-start], [data-hangman] [data-secret] { text-align: center; }
@@ -124,3 +125,10 @@ nav[data-toc] ul { flex-wrap: wrap; justify-content: center; }
 dl dt { font-weight: 600; margin-top: 0.75rem; }
 dl dd { margin-inline-start: 0; }
 :where(p, li, dd, td) > code { overflow-wrap: anywhere; }
+
+/* Invite: copy code / copy link / native share */
+[data-code][title] { cursor: copy; }
+body > header [data-invite] { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; margin: 1.25rem 0 0; }
+footer[data-invite] { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+footer[data-invite] > span { flex: 1 0 100%; color: var(--y-text-3); font-size: 0.875rem; }
+footer[data-invite] > button { padding: 0.45rem 0.9rem; font-size: 0.7rem; }
