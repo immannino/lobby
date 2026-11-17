@@ -30,6 +30,12 @@
 
 <main>
   <section>
+    <article data-recent hidden>
+      <h2>Your recent rooms</h2>
+      <ul data-recent-list></ul>
+      <footer><button type="button" data-clear-history>Clear history</button></footer>
+    </article>
+
     <article>
       <h2>Join a room</h2>
       <form id="join">
@@ -67,18 +73,20 @@
 </footer>
 
 <script type="module">
+  import { createRoom, joinRoom } from "/api/client.js";
+  import * as history from "/static/history.js";
+
   // Fill the game picker from the server's registry.
+  const games = await fetch("/api/games").then((r) => r.json()).catch(() => []);
   {
     const select = document.getElementById("create-game");
     const blurb = document.querySelector("[data-blurb]");
-    const games = await fetch("/api/games").then((r) => r.json()).catch(() => []);
     if (games.length) select.replaceChildren(...games.map((g) => Object.assign(document.createElement("option"), { value: g.name, textContent: g.title })));
     const show = () => (blurb.textContent = games.find((g) => g.name === select.value)?.blurb ?? "");
     select.onchange = show;
     show();
   }
-
-  import { createRoom, joinRoom } from "/api/client.js";
+  const gameTitle = (name) => games.find((g) => g.name === name)?.title ?? name ?? "Game";
 
   const params = new URLSearchParams(location.search);
   const join = document.getElementById("join");
@@ -99,6 +107,79 @@
       err.textContent = e.message.charAt(0).toUpperCase() + e.message.slice(1);
       btn.disabled = false;
     }
+  }
+
+  // ---- Recent rooms (this browser only; see /static/history.js) ----
+
+  // One-click rejoin. With a valid seat cookie the room page just works;
+  // if the seat expired it sends us back here with ?rejoin=1 and we take a
+  // new seat under the same name (or as the big screen again).
+  function rejoinRequest(entry) {
+    return entry.role === "display" ? { role: "display" } : { name: entry.name };
+  }
+
+  const agoFormat = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+  function ago(t) {
+    const mins = Math.round((t - Date.now()) / 60000);
+    return Math.abs(mins) < 60 ? agoFormat.format(mins, "minute") : agoFormat.format(Math.round(mins / 60), "hour");
+  }
+
+  async function renderRecent() {
+    const card = document.querySelector("[data-recent]");
+    const list = document.querySelector("[data-recent-list]");
+    const entries = history.load();
+    card.hidden = entries.length === 0;
+    if (!entries.length) return;
+
+    list.replaceChildren(
+      ...entries.map((e) => {
+        const li = document.createElement("li");
+        li.dataset.entry = e.code;
+        const code = Object.assign(document.createElement("strong"), { textContent: e.code });
+        code.dataset.code = "";
+        const who = e.role === "display" ? "as the big screen" : `as ${e.name}`;
+        const meta = Object.assign(document.createElement("span"), { textContent: `${gameTitle(e.game)} · ${who} · ${ago(e.at)}` });
+        meta.dataset.meta = "";
+        const btn = Object.assign(document.createElement("button"), { type: "button", textContent: "Rejoin", disabled: true });
+        btn.onclick = () => (location.href = `/r/${e.code}`);
+        li.append(code, meta, btn);
+        // Is the room still open? (Rooms close when everyone leaves or after
+        // a while with nobody connected.)
+        fetch(`/api/rooms/${e.code}`).then(async (res) => {
+          if (res.ok) {
+            const info = await res.json();
+            btn.disabled = false;
+            meta.textContent += ` · ${info.players} ${info.players === 1 ? "player" : "players"}`;
+          } else if (res.status === 404) {
+            li.dataset.ended = "";
+            btn.textContent = "Ended";
+          }
+        }).catch(() => {});
+        return li;
+      }),
+    );
+  }
+  document.querySelector("[data-clear-history]").onclick = () => {
+    history.clear();
+    renderRecent();
+  };
+  renderRecent();
+
+  // Back from a room whose seat expired: rejoin automatically, but only for
+  // rooms in this browser's history (so a crafted link can't join you
+  // anywhere you haven't been).
+  const rejoinEntry = params.get("rejoin") && history.find((params.get("code") ?? "").toUpperCase());
+  if (rejoinEntry) {
+    const alert = join.querySelector("[role=alert]");
+    alert.textContent = "Your seat expired. Rejoining…";
+    if (rejoinEntry.name) join.elements.name.value = rejoinEntry.name;
+    joinRoom("/api", rejoinEntry.code, rejoinRequest(rejoinEntry))
+      .then((res) => (location.href = `/r/${res.code}`))
+      .catch((e) => {
+        alert.textContent = `Couldn't rejoin: ${e.message}`;
+        if (e.message.includes("not found")) history.forget(rejoinEntry.code);
+        renderRecent();
+      });
   }
 
   join.addEventListener("submit", (ev) => {

@@ -29,7 +29,7 @@ go get github.com/immannino/lobby
 | `sqlitestore/` | Optional SQLite `Store` (modernc.org/sqlite, no cgo). |
 | `client.js` | Browser client, served by `Manager.Handler()` at `/client.js`. |
 | `lobbytest/` | Test helpers: play your game with in-process clients and assert on your own Go types. |
-| `examples/games/` | Example games, each a package with its own browser module: `chat`, `tictactoe`, `connect4`, `hangman`, plus the shared `duel` (two-player, winner stays on) and `botkit` (computer players over `LocalConn`). |
+| `examples/games/` | Example games, each a package with its own browser module: `chat`, `tictactoe`, `connect4`, `hangman`, `poll`, plus the shared `duel` (two-player, winner stays on) and `botkit` (computer players over `LocalConn`). |
 | `examples/quickstart/` | A complete buzzer game in ~35 lines of Go. Start here. |
 | `examples/site/` | The website: landing page, docs (`/docs`) and a live demo (`/play`) of all the example games. |
 | `docs/storage.md` | In-memory vs. SQLite vs. Postgres/MySQL, with schemas. |
