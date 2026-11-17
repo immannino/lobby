@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>lobby · party-game rooms for Go</title>
+  <meta name="description" content="A Go package for Jackbox-style multiplayer rooms: short join codes, phones as controllers, a shared big screen, and reconnects that keep your seat.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/immannino/yearn.css@0.1.0/dist/yearn.min.css">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/demo.css">
+</head>
+<body data-page="home">
+<header>
+  <nav>
+    <a href="/"><strong>lobby</strong></a>
+    <ul>
+      <li><a href="/play">Play</a></li>
+      <li><a href="/docs">Docs</a></li>
+      <li><a href="https://github.com/immannino/lobby">GitHub</a></li>
+    </ul>
+  </nav>
+  <hgroup>
+    <p>A Go package</p>
+    <h1>Party-game rooms in <em>one import</em></h1>
+    <p>Short join codes, phones as controllers, a shared big screen, and reconnects that keep your seat. You write the game. lobby runs the room.</p>
+  </hgroup>
+  <p>
+    <a href="/docs" role="button">Get started</a>
+    <a href="/play" role="button">Play the demo</a>
+  </p>
+  <form data-hero-join action="/play">
+    <label for="hero-code">Got a code?</label>
+    <input id="hero-code" name="code" maxlength="4" placeholder="BCDF" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+    <button>Join</button>
+  </form>
+</header>
+
+<main>
+  <section id="how">
+    <hgroup>
+      <h5>How it works</h5>
+      <h2>Big screen, small screens, <em>one room</em></h2>
+    </hgroup>
+    <article>
+      <h6>01</h6>
+      <h3>Someone opens a room</h3>
+      <p>The TV or laptop gets a four-letter code. Codes use only consonants, so they can't spell words.</p>
+    </article>
+    <article>
+      <h6>02</h6>
+      <h3>Everyone joins from their phone</h3>
+      <p>Type the code and a name, no account needed. Refresh, lock the screen, lose signal: you keep your seat.</p>
+    </article>
+    <article>
+      <h6>03</h6>
+      <h3>Your game gets the events</h3>
+      <p>Joins, leaves and moves arrive one at a time on the room's own goroutine. No locks, no races, no websocket plumbing.</p>
+    </article>
+  </section>
+
+  <section id="code">
+    <hgroup>
+      <h5>The whole game</h5>
+      <h2>A buzzer in 35 lines</h2>
+      <p>The first player to buzz wins and the VIP resets. This is the complete server for <a href="https://github.com/immannino/lobby/tree/main/examples/quickstart"><code>examples/quickstart</code></a>.</p>
+    </hgroup>
+<pre><code data-src="quickstart-go">// buzzer is the whole game. Its methods run one at a time on the room's
+// goroutine, so plain fields are safe without locks.
+type buzzer struct {
+	lobby.BaseGame
+	winner string // name of the first player to buzz, "" while open
+}
+
+func (b *buzzer) OnConnect(ctx context.Context, r *lobby.Room, c lobby.Client) {
+	r.Send(c.ID, "buzz", b.winner) // catch up anyone who (re)connects
+}
+
+func (b *buzzer) OnMessage(ctx context.Context, r *lobby.Room, c lobby.Client, m lobby.Message) {
+	switch {
+	case m.Type == "buzz" &amp;&amp; b.winner == "" &amp;&amp; c.Role == lobby.RolePlayer:
+		b.winner = c.Name
+	case m.Type == "reset" &amp;&amp; c.ID == r.VIP():
+		b.winner = ""
+	default:
+		return
+	}
+	r.Broadcast("buzz", b.winner)
+}
+
+//go:embed index.html
+var page []byte
+
+func main() {
+	m := lobby.New(lobby.Config{
+		NewGame: func(code, kind string) (lobby.Game, error) { return &amp;buzzer{}, nil },
+	})
+	http.Handle("/api/", http.StripPrefix("/api", m.Handler()))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write(page) })
+	log.Println("open http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}</code></pre>
+    <p>The browser side uses the client the library serves:</p>
+<pre><code>import { createRoom, joinRoom, connect } from "/api/client.js";
+const $ = (id) =&gt; document.getElementById(id);
+
+$("join").onsubmit = async (ev) =&gt; {
+  ev.preventDefault();
+  const { code, name } = Object.fromEntries(new FormData(ev.target));
+  try {
+    const res = code ? await joinRoom("/api", code, { name }) : await createRoom("/api", { name });
+    play(res.code, res.client.id);
+  } catch (err) {
+    ev.target.querySelector("[role=alert]").textContent = err.message;
+  }
+};
+
+function play(code, me) {
+  $("join").hidden = true;
+  $("game").hidden = false;
+  $("title").textContent = `Room ${code}`;
+  const room = connect("/api", code, {
+    onMessage({ type, data }) {
+      if (type === "lobby.state") $("reset").hidden = data.vip !== me;
+      if (type === "buzz") $("winner").textContent = data ? `${data} buzzed first!` : "Waiting for a buzz…";
+    },
+  });
+  $("buzz").onclick = () =&gt; room.send("buzz");
+  $("reset").onclick = () =&gt; room.send("reset");
+}</code></pre>
+    <p><a href="/docs" role="button">Read the guide</a></p>
+  </section>
+
+  <section id="features">
+    <hgroup>
+      <h5>What you get</h5>
+      <h2>The boring parts, <em>done properly</em></h2>
+    </hgroup>
+    <article>
+      <h3>Seats, not sockets</h3>
+      <p>Identity is a token held in an HttpOnly cookie. Reconnecting reclaims your seat, and a second tab takes over from the first. Seats wait two minutes for you to come back.</p>
+    </article>
+    <article>
+      <h3>One goroutine per room</h3>
+      <p>Every callback for a room runs in order, so game state is plain Go fields. Timers (<code>r.After</code>) run on the same goroutine.</p>
+    </article>
+    <article>
+      <h3>Players and a display</h3>
+      <p>Phones are players, and the TV is a display. The first player is VIP and can kick or lock the room.</p>
+    </article>
+    <article>
+      <h3>Bots and tests, in-process</h3>
+      <p><code>LocalConn</code> is a full player over Go channels: no network, no JSON. Computer opponents and table-driven game tests use the same API.</p>
+    </article>
+    <article>
+      <h3>Survives restarts</h3>
+      <p>SQLite persistence is built in (pure Go, no cgo). Rooms, seats and game state come back after a deploy, and phones reconnect on their own.</p>
+    </article>
+    <article>
+      <h3>Hard to abuse</h3>
+      <p>Joins are rate limited per IP, and messages per connection. Slow clients get dropped instead of stalling the room, and a panicking game doesn't take the server down.</p>
+    </article>
+  </section>
+
+  <section id="compare">
+    <hgroup>
+      <h5>Compared with</h5>
+      <h2>Where it fits</h2>
+      <p>If you've used Socket.IO or PartyKit, here's the short version.</p>
+    </hgroup>
+    <article>
+      <table>
+        <thead>
+          <tr><th></th><th>lobby</th><th>Socket.IO</th><th>PartyKit</th></tr>
+        </thead>
+        <tbody>
+          <tr><th>Runs on</th><td>Your Go server</td><td>Your Node server</td><td>Cloudflare (hosted)</td></tr>
+          <tr><th>Join by short code</th><td>Built in</td><td>Build it</td><td>Build it</td></tr>
+          <tr><th>Reconnect to the same seat</th><td>Built in</td><td>Short gaps (state recovery)</td><td>Build it</td></tr>
+          <tr><th>Serialized per-room state</th><td>Goroutine per room</td><td>Build it</td><td>Durable Object per room</td></tr>
+          <tr><th>Host display + VIP</th><td>Built in</td><td>Build it</td><td>Build it</td></tr>
+          <tr><th>Persistence</th><td>SQLite or your DB</td><td>Build it</td><td>Durable storage</td></tr>
+          <tr><th>Many machines</th><td>One process per room set; route by code</td><td>Redis adapter</td><td>Built in</td></tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+
+  <section id="numbers">
+    <hgroup>
+      <h5>Benchmarks</h5>
+      <h2>Fast enough to forget about</h2>
+      <p>From <code>make bench</code> on a laptop. A broadcast is encoded to JSON once, however many people receive it.</p>
+    </hgroup>
+    <article><h3>~1&thinsp;µs</h3><p>One move fanned out to 8 in-process players</p></article>
+    <article><h3>~25&thinsp;µs</h3><p>Websocket round trip: send, game logic, reply</p></article>
+    <article><h3>~52&thinsp;µs</h3><p>One move fanned out to 8 websocket players</p></article>
+  </section>
+
+  <section id="agents">
+    <hgroup>
+      <h5>Built for agents, too</h5>
+      <h2>Ask your coding agent for a game</h2>
+      <p>The repo ships an <a href="https://github.com/immannino/lobby/blob/main/AGENTS.md"><code>AGENTS.md</code></a> covering the API, the rules that keep games correct, and the common mistakes. Point Claude, Codex or Cursor at it and ask for trivia with a 15-second timer.</p>
+    </hgroup>
+  </section>
+</main>
+
+<footer>
+  <p>MIT-licensed, on <a href="https://github.com/immannino/lobby">GitHub</a>. Styled with <a href="https://yearn.ope.cool/">yearn.css</a>.</p>
+  <nav data-themes aria-label="Theme"></nav>
+</footer>
+</body>
+</html>

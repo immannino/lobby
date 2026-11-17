@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buzzer</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/immannino/yearn.css@0.1.0/dist/yearn.min.css">
+<main>
+  <article>
+    <h1 id="title">Buzzer</h1>
+    <form id="join">
+      <input name="code" placeholder="Room code (blank to create)" autocomplete="off">
+      <input name="name" placeholder="Your name" required>
+      <button>Go</button>
+      <p role="alert"></p>
+    </form>
+    <div id="game" hidden>
+      <p><button id="buzz">Buzz!</button> <button id="reset" hidden>Reset</button></p>
+      <h2 id="winner">Waiting for a buzz…</h2>
+    </div>
+  </article>
+</main>
+<script type="module">
+  import { createRoom, joinRoom, connect } from "/api/client.js";
+  const $ = (id) => document.getElementById(id);
+
+  $("join").onsubmit = async (ev) => {
+    ev.preventDefault();
+    const { code, name } = Object.fromEntries(new FormData(ev.target));
+    try {
+      const res = code ? await joinRoom("/api", code, { name }) : await createRoom("/api", { name });
+      play(res.code, res.client.id);
+    } catch (err) {
+      ev.target.querySelector("[role=alert]").textContent = err.message;
+    }
+  };
+
+  function play(code, me) {
+    $("join").hidden = true;
+    $("game").hidden = false;
+    $("title").textContent = `Room ${code}`;
+    const room = connect("/api", code, {
+      onMessage({ type, data }) {
+        if (type === "lobby.state") $("reset").hidden = data.vip !== me;
+        if (type === "buzz") $("winner").textContent = data ? `${data} buzzed first!` : "Waiting for a buzz…";
+      },
+    });
+    $("buzz").onclick = () => room.send("buzz");
+    $("reset").onclick = () => room.send("reset");
+  }
+</script>

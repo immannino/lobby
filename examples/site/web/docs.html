@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Docs · lobby</title>
+  <meta name="description" content="Getting started with lobby: rooms, games, the browser client, testing, persistence and deployment.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/immannino/yearn.css@0.1.0/dist/yearn.min.css">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/demo.css">
+</head>
+<body data-page="docs">
+<header>
+  <nav>
+    <a href="/"><strong>lobby</strong></a>
+    <ul>
+      <li><a href="/play">Play</a></li>
+      <li><a href="/docs" aria-current="page">Docs</a></li>
+      <li><a href="https://github.com/immannino/lobby">GitHub</a></li>
+    </ul>
+  </nav>
+  <hgroup>
+    <p>Documentation</p>
+    <h1>Build a party game</h1>
+    <p>From <code>go get</code> to a phone joining your room in a few minutes.</p>
+  </hgroup>
+</header>
+<main>
+<nav data-toc aria-label="On this page"><ul>
+<li><a href="#start">Getting started</a></li>
+<li><a href="#concepts">Concepts</a></li>
+<li><a href="#game">Writing a game</a></li>
+<li><a href="#browser">Browser client</a></li>
+<li><a href="#test">Testing</a></li>
+<li><a href="#persist">Persistence</a></li>
+<li><a href="#deploy">Deploying</a></li>
+<li><a href="#config">Configuration</a></li>
+<li><a href="#protocol">Wire protocol</a></li>
+<li><a href="#agents">Using with AI agents</a></li>
+</ul></nav>
+<section id="start">
+<h2>Getting started</h2>
+<p>Install the package (Go 1.26 or newer):</p>
+<pre><code data-lang="sh">go get github.com/immannino/lobby</code></pre>
+<p>Or run the finished buzzer game first, then open it on a laptop and a phone:</p>
+<pre><code data-lang="sh">go run github.com/immannino/lobby/examples/quickstart@latest</code></pre>
+<p>The whole server:</p>
+<pre><code data-lang="go">package main
+
+import (
+	"context"
+	_ "embed"
+	"log"
+	"net/http"
+
+	"github.com/immannino/lobby"
+)
+
+// buzzer is the whole game. Its methods run one at a time on the room's
+// goroutine, so plain fields are safe without locks.
+type buzzer struct {
+	lobby.BaseGame
+	winner string // name of the first player to buzz, "" while open
+}
+
+func (b *buzzer) OnConnect(ctx context.Context, r *lobby.Room, c lobby.Client) {
+	r.Send(c.ID, "buzz", b.winner) // catch up anyone who (re)connects
+}
+
+func (b *buzzer) OnMessage(ctx context.Context, r *lobby.Room, c lobby.Client, m lobby.Message) {
+	switch {
+	case m.Type == "buzz" &amp;&amp; b.winner == "" &amp;&amp; c.Role == lobby.RolePlayer:
+		b.winner = c.Name
+	case m.Type == "reset" &amp;&amp; c.ID == r.VIP():
+		b.winner = ""
+	default:
+		return
+	}
+	r.Broadcast("buzz", b.winner)
+}
+
+//go:embed index.html
+var page []byte
+
+func main() {
+	m := lobby.New(lobby.Config{
+		NewGame: func(code, kind string) (lobby.Game, error) { return &amp;buzzer{}, nil },
+	})
+	http.Handle("/api/", http.StripPrefix("/api", m.Handler()))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) { w.Write(page) })
+	log.Println("open http://localhost:8080")
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}</code></pre>
+<p><code>Handler()</code> serves the HTTP API and the browser client, <code>/client.js</code>. Mount it under any prefix.</p>
+</section>
+<section id="concepts">
+<h2>Concepts</h2>
+<dl>
+<dt>Room</dt><dd>A game session with a short code such as <code>BCDF</code>. Each room runs your <code>Game</code> on its own goroutine.</dd>
+<dt>Client</dt><dd>A seat in a room. A player is a phone, with a name, and counts toward <code>MaxPlayers</code>. A display is the big screen.</dd>
+<dt>VIP</dt><dd>The earliest-joined player. They can kick people and lock the room, and they move to the next player when they leave.</dd>
+<dt>Token</dt><dd>Joining returns a random token, also set as an HttpOnly cookie. Only its hash is stored. Reconnecting with it reclaims the seat, even after a server restart.</dd>
+<dt>Connection</dt><dd>A websocket, or a <code>LocalConn</code> for in-process clients. Seats outlive connections: a dropped client keeps its seat for <code>ReconnectGrace</code> (2 minutes).</dd>
+</dl>
+</section>
+<section id="game">
+<h2>Writing a game</h2>
+<p>Embed <code>lobby.BaseGame</code> and override the hooks you need. Hooks run one at a time on the room's goroutine, so game state is plain fields.</p>
+<pre><code data-lang="go">type Game interface {
+	OnJoin(ctx context.Context, r *Room, c Client)       // took a seat
+	OnLeave(ctx context.Context, r *Room, c Client)      // seat gone: left, kicked, or expired
+	OnConnect(ctx context.Context, r *Room, c Client)    // a connection attached; send a snapshot
+	OnDisconnect(ctx context.Context, r *Room, c Client) // dropped; seat kept for now
+	OnMessage(ctx context.Context, r *Room, c Client, m Message)
+}</code></pre>
+<p>Inside a hook, talk to the room:</p>
+<pre><code data-lang="go">r.Broadcast("view", v)            // everyone (JSON-encoded once)
+r.SendRole(lobby.RoleDisplay, "view", v)
+r.Send(c.ID, "error", map[string]string{"error": "not your turn"})
+stop := r.After(20*time.Second, func(ctx context.Context, r *lobby.Room) { /* time's up */ })
+r.SetLocked(ctx, true)            // no new players mid-round
+r.Persist(ctx)                    // save now, if a Store is configured</code></pre>
+<p>From outside a hook, such as an HTTP handler or a goroutine, use <code>room.Do(ctx, func(ctx context.Context, r *lobby.Room) { ... })</code>.</p>
+<h3>Rules that keep games correct</h3>
+<ol>
+<li><strong>Don't block in hooks.</strong> Don't use mutexes, sleeps or network calls. Use <code>r.After</code> for delays, and a goroutine plus <code>room.Do</code> for slow work.</li>
+<li><strong>Send copies, not live state.</strong> In-process clients receive the exact value you pass. Build a fresh view struct for each send.</li>
+<li><strong>No nil slices or maps in views.</strong> They become JSON <code>null</code> and break the browser.</li>
+<li><strong>Secrets need per-client sends.</strong> Loop over <code>r.Clients()</code> and <code>r.Send</code> each one their own view.</li>
+<li><strong>Validate everything.</strong> Check who sent it (<code>c.ID</code>, <code>c.Role</code>), whose turn it is, and whether <code>m.Decode</code> succeeded.</li>
+</ol>
+</section>
+<section id="browser">
+<h2>Browser client</h2>
+<pre><code data-lang="js">import { createRoom, joinRoom, connect } from "/api/client.js";
+
+const { code } = await createRoom("/api", { name: "Ada", game: "trivia" }); // or { role: "display" }
+const room = connect("/api", code, {
+  onMessage({ type, data }) { /* lobby.welcome, lobby.state, then your types */ },
+  onStatus(status, detail) { /* "open" | "reconnecting" | "closed" */ },
+});
+room.send("answer", 2);
+room.kick(id); room.lock(true); room.leave();</code></pre>
+<p>It reconnects with backoff, and immediately when a phone wakes up. It stops on terminal close codes: kicked, room closed, or replaced by another tab.</p>
+</section>
+<section id="test">
+<h2>Testing</h2>
+<p><code>lobbytest</code> plays your game with in-process clients. There's no server, and you assert on your own Go types:</p>
+<pre><code data-lang="go">func TestBuzz(t *testing.T) {
+	m := lobbytest.Manager(t, func() lobby.Game { return &amp;buzzer{} })
+	ada, code := lobbytest.Create(t, m, "Ada")
+	bob := lobbytest.Join(t, m, code, "Bob")
+	lobbytest.Send(t, bob, "buzz", nil)
+	if got := lobbytest.Wait(t, ada, func(s string) bool { return s != "" }); got != "Bob" {
+		t.Fatalf("winner = %q", got)
+	}
+}</code></pre>
+<p>Computer players use the same mechanism. See <code>examples/games/botkit</code>.</p>
+</section>
+<section id="persist">
+<h2>Persistence</h2>
+<p>Rooms live in memory by default. To survive restarts, add a store and implement <code>Snapshotter</code> (<code>Snapshot() ([]byte, error)</code>, <code>Restore([]byte) error</code>) on your game:</p>
+<pre><code data-lang="go">store, err := sqlitestore.Open(ctx, "lobby.db") // pure Go, no cgo
+m := lobby.New(lobby.Config{NewGame: newGame, Store: store})
+if err := m.Restore(ctx); err != nil { ... }   // at startup
+defer m.Shutdown(ctx)                           // persists rooms, tells clients to reconnect</code></pre>
+<p>For Postgres or MySQL, implement the three-method <code>lobby.Store</code> interface. See <a href="https://github.com/immannino/lobby/blob/main/docs/storage.md">docs/storage.md</a>.</p>
+</section>
+<section id="deploy">
+<h2>Deploying</h2>
+<p>lobby is one Go binary. Put it behind any HTTPS proxy, and keep two things in mind. Don't set <code>http.Server.WriteTimeout</code>, because it kills websockets. Run a single instance, because rooms live in that process's memory.</p>
+<h3>Railway</h3>
+<ol>
+<li>Create a service from the GitHub repo. Railway builds the root <code>Dockerfile</code>, which builds this site.</li>
+<li>Add a volume mounted at <code>/data</code>. The image stores rooms in <code>/data/lobby.db</code>, so they survive deploys.</li>
+<li>Set variables: <code>LOBBY_PROXY_HEADER=X-Real-IP</code> (per-IP rate limits behind Railway's proxy) and <code>LOBBY_SECURE_COOKIES=true</code>.</li>
+<li>Set the health check path to <code>/healthz</code>. It returns live stats as JSON.</li>
+</ol>
+<p>Railway sends <code>SIGTERM</code> on redeploy. The server persists every room and tells clients "going away", so phones reconnect to the new deployment and keep their seats.</p>
+</section>
+<section id="config">
+<h2>Configuration</h2>
+<table>
+<thead><tr><th>Field</th><th>Default</th><th></th></tr></thead>
+<tbody>
+<tr><td><code>NewGame</code></td><td>required</td><td>Returns the game for a room; <code>kind</code> comes from the create request.</td></tr>
+<tr><td><code>Store</code></td><td>nil (memory)</td><td>Persistence.</td></tr>
+<tr><td><code>MaxPlayers</code></td><td>8</td><td>Per room; displays don't count.</td></tr>
+<tr><td><code>CodeLength</code></td><td>4</td><td>Consonants only.</td></tr>
+<tr><td><code>ReconnectGrace</code></td><td>2m</td><td>How long a dropped client keeps its seat.</td></tr>
+<tr><td><code>IdleTimeout</code></td><td>10m</td><td>Close rooms nobody is connected to.</td></tr>
+<tr><td><code>RateLimit</code></td><td>30/min</td><td>Creates and joins per IP.</td></tr>
+<tr><td><code>MessageRate</code> / <code>MessageBurst</code></td><td>20/s, 40</td><td>Per connection; excess closes with 1008.</td></tr>
+<tr><td><code>MaxMessageBytes</code></td><td>32 KiB</td><td>Per incoming message.</td></tr>
+<tr><td><code>PingInterval</code></td><td>30s</td><td>Keepalive through proxies.</td></tr>
+<tr><td><code>ClientIP</code></td><td>RemoteAddr</td><td>Use <code>lobby.HeaderClientIP("X-Real-IP")</code> behind a proxy.</td></tr>
+<tr><td><code>OriginPatterns</code>, <code>SecureCookies</code>, <code>Logger</code></td><td></td><td></td></tr>
+</tbody>
+</table>
+<p><code>m.Stats()</code> returns counters for rooms, connections, messages, drops, rate limits and panics, ready for expvar or Prometheus.</p>
+</section>
+<section id="protocol">
+<h2>Wire protocol</h2>
+<p>Every websocket frame is <code>{"type": "...", "data": ...}</code>. Types starting with <code>lobby.</code> are reserved.</p>
+<table>
+<thead><tr><th>Direction</th><th>Type</th><th>Data</th></tr></thead>
+<tbody>
+<tr><td>server → client</td><td><code>lobby.welcome</code></td><td><code>{protocol, code, game, you}</code></td></tr>
+<tr><td>server → client</td><td><code>lobby.state</code></td><td><code>{code, vip, locked, clients[]}</code></td></tr>
+<tr><td>server → client</td><td><code>lobby.error</code></td><td><code>{error}</code></td></tr>
+<tr><td>client → server</td><td><code>lobby.leave</code> · <code>lobby.kick {id}</code> · <code>lobby.lock {locked}</code></td><td>kick and lock: VIP only</td></tr>
+</tbody>
+</table>
+<p>Terminal close codes: 4401 unauthorized, 4403 kicked, 4404 not found, 4409 replaced, 4410 room closed. Anything else means reconnect.</p>
+<p>HTTP: <code>POST /rooms</code>, <code>GET /rooms/{code}</code>, <code>POST /rooms/{code}/join</code>, <code>GET /rooms/{code}/ws</code>, <code>GET /client.js</code>.</p>
+</section>
+<section id="agents">
+<h2>Using with AI agents</h2>
+<p>The repository includes <a href="https://github.com/immannino/lobby/blob/main/AGENTS.md">AGENTS.md</a>, a guide written for coding agents. It covers a minimal integration, the <code>Game</code> contract, the rules above, recipes for bots, two-player games and tests, and a table of common mistakes. Most agents read it automatically. Otherwise, point yours at it and ask for a game.</p>
+</section>
+</main>
+<footer>
+  <p><a href="https://pkg.go.dev/github.com/immannino/lobby">API reference on pkg.go.dev</a> · <a href="https://github.com/immannino/lobby">GitHub</a></p>
+  <nav data-themes aria-label="Theme"></nav>
+</footer>
+</body>
+</html>

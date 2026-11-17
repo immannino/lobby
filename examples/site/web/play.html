@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Play · lobby</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/immannino/yearn.css@0.1.0/dist/yearn.min.css">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/demo.css">
+</head>
+<body>
+<header>
+  <nav>
+    <a href="/"><strong>lobby</strong></a>
+    <ul>
+      <li><a href="/play" aria-current="page">Play</a></li>
+      <li><a href="/docs">Docs</a></li>
+      <li><a href="https://github.com/immannino/lobby">GitHub</a></li>
+    </ul>
+  </nav>
+  <hgroup>
+    <p>Live demo</p>
+    <h1>Play</h1>
+    <p>Open a room on the big screen, then join from your phone with the code.</p>
+  </hgroup>
+</header>
+
+<main>
+  <section>
+    <article>
+      <h2>Join a room</h2>
+      <form id="join">
+        <label for="join-code">Room code</label>
+        <input id="join-code" name="code" maxlength="4" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+        <label for="join-name">Your name</label>
+        <input id="join-name" name="name" maxlength="20" autocomplete="nickname" required>
+        <div><button>Join</button></div>
+        <p role="alert"></p>
+      </form>
+    </article>
+
+    <article>
+      <h2>Start a room</h2>
+      <form id="create">
+        <label for="create-game">Game</label>
+        <select id="create-game" name="game">
+          <option value="tictactoe">Tic-tac-toe</option>
+        </select>
+        <small data-blurb></small>
+        <label for="create-name">Your name</label>
+        <input id="create-name" name="name" maxlength="20" autocomplete="nickname" required>
+        <div>
+          <button>Create and play</button>
+          <button type="button" data-display>Host on this screen</button>
+        </div>
+        <p role="alert"></p>
+      </form>
+    </article>
+  </section>
+</main>
+
+<footer>
+  <nav data-themes aria-label="Theme"></nav>
+</footer>
+
+<script type="module">
+  // Fill the game picker from the server's registry.
+  {
+    const select = document.getElementById("create-game");
+    const blurb = document.querySelector("[data-blurb]");
+    const games = await fetch("/api/games").then((r) => r.json()).catch(() => []);
+    if (games.length) select.replaceChildren(...games.map((g) => Object.assign(document.createElement("option"), { value: g.name, textContent: g.title })));
+    const show = () => (blurb.textContent = games.find((g) => g.name === select.value)?.blurb ?? "");
+    select.onchange = show;
+    show();
+  }
+
+  import { createRoom, joinRoom } from "/api/client.js";
+
+  const params = new URLSearchParams(location.search);
+  const join = document.getElementById("join");
+  const create = document.getElementById("create");
+
+  if (params.get("code")) join.elements.code.value = params.get("code");
+  if (params.get("msg")) join.querySelector("[role=alert]").textContent = params.get("msg");
+  (params.get("code") ? join.elements.name : join.elements.code).focus();
+
+  async function go(form, btn, action) {
+    const err = form.querySelector("[role=alert]");
+    err.textContent = "";
+    btn.disabled = true;
+    try {
+      const res = await action();
+      location.href = `/r/${res.code}`;
+    } catch (e) {
+      err.textContent = e.message.charAt(0).toUpperCase() + e.message.slice(1);
+      btn.disabled = false;
+    }
+  }
+
+  join.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const { code, name } = Object.fromEntries(new FormData(join));
+    go(join, ev.submitter ?? join.querySelector("button"), () => joinRoom("/api", code, { name }));
+  });
+  create.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    go(create, ev.submitter ?? create.querySelector("button"), () => createRoom("/api", { name: create.elements.name.value, game: create.elements.game.value }));
+  });
+  create.querySelector("[data-display]").addEventListener("click", (ev) => {
+    go(create, ev.currentTarget, () => createRoom("/api", { role: "display", game: create.elements.game.value }));
+  });
+</script>
+</body>
+</html>

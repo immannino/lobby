@@ -1,0 +1,126 @@
+/* Demo-only additions on top of yearn.css (classless). Everything hooks onto
+   data-* attributes the page script already uses; there are no classes. */
+
+[role="alert"] { color: var(--y-danger); min-height: 1.6em; margin: 0.5rem 0 0; }
+[role="alert"]:empty { visibility: hidden; }
+
+/* Reconnecting banner */
+aside#banner { position: sticky; top: var(--y-inset); z-index: 2; margin: var(--y-inset) 0; text-align: center; }
+aside#banner[hidden] { display: none; }
+
+/* Room code */
+[data-code] { font-family: var(--y-font-mono); font-weight: 500; letter-spacing: 0.2em; }
+body > header [data-code] { display: block; font-size: clamp(4rem, 16vw, 9rem); line-height: 1; margin: 0.5rem 0 0; }
+/* letter-spacing trails the last glyph; pad the start so the code centers */
+[data-code] { padding-inline-start: 0.2em; }
+
+/* Top bar on phones */
+body > nav { margin-top: var(--y-inset); padding-inline-start: 1.25rem; }
+body > nav [data-code] { font-size: 1.25rem; }
+
+/* Counter */
+[data-counter] { display: flex; align-items: center; justify-content: center; gap: 1.5rem; }
+[data-counter] button { width: 3.5rem; height: 3.5rem; padding: 0; font-size: 1.5rem; letter-spacing: 0; color: var(--y-text); background: var(--y-fill); }
+[data-counter] button[data-add="1"] { color: var(--y-on-ink); background: var(--y-ink); }
+[data-count] { font-size: 3rem; min-width: 3ch; text-align: center; background: none; }
+body[data-role="display"] [data-count] { font-size: clamp(4rem, 10vw, 7rem); }
+
+/* Players */
+[data-players] { list-style: none; padding: 0; margin: 0; }
+[data-players] li { display: flex; align-items: center; gap: 0.6rem; padding: 0; }
+[data-players] li > [data-dot] { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--y-text-4); flex: none; }
+[data-players] li > [data-dot="on"] { background: var(--y-success); }
+[data-players] li > [data-kick] { margin-inline-start: auto; padding: 0.35rem 0.8rem; font-size: 0.7rem; color: var(--y-text); background: var(--y-fill); }
+[data-players] li > [data-aside] { margin-inline-start: auto; color: var(--y-text-3); }
+[data-players] li > [data-aside] ~ [data-kick] { margin-inline-start: 0; }
+
+/* Chat */
+[data-chat] { display: flex; flex-direction: column; gap: 0.25rem; max-height: 16rem; overflow-y: auto; margin-bottom: 1rem; }
+body[data-role="display"] [data-chat] { max-height: 45vh; font-size: 1.2rem; }
+[data-chat] > [data-system] { color: var(--y-text-3); font-style: italic; font-size: 0.9em; }
+[data-chat] b { margin-inline-end: 0.4rem; }
+[data-chat-form] { display: flex; gap: 0.5rem; align-items: center; }
+[data-chat-form] input { flex: 1; margin: 0; }
+
+/* Join code input */
+input[name="code"] { font-family: var(--y-font-mono); text-transform: uppercase; letter-spacing: 0.3em; font-size: 1.25rem; }
+
+/* Theme picker */
+nav[data-themes] { justify-content: center; font-size: 0.875rem; }
+
+/* Duel games (tic-tac-toe, connect 4): shared card from duel.js */
+[data-duel] hgroup { margin: 0 0 1.25rem; text-align: center; }
+[data-duel] hgroup p { margin: 0.25rem 0 0; }
+[data-duel][data-my-turn="yes"] [data-headline] { color: var(--y-accent); }
+[data-duel] [data-actions] { text-align: center; margin: 1.25rem 0 0; }
+[data-board] { display: grid; gap: 0.5rem; margin: 0 auto; }
+/* Selectors carry [data-cell] to outrank yearn's "button ~ button" secondary style. */
+[data-board] > button[data-cell] {
+  aspect-ratio: 1; padding: 0; min-width: 0; letter-spacing: 0; text-transform: none;
+  color: var(--y-text); background: var(--y-fill);
+}
+[data-board] > button[data-cell]:disabled { opacity: 1; cursor: default; } /* yearn dims disabled buttons; marks must stay crisp */
+[data-duel][data-my-turn="yes"] [data-board] > button[data-cell]:not(:disabled):hover { background: var(--y-fill-hover); }
+
+/* Tic-tac-toe */
+[data-board][data-grid="ttt"] { grid-template-columns: repeat(3, 1fr); max-width: 20rem; }
+body[data-role="display"] [data-board][data-grid="ttt"] { max-width: 26rem; }
+[data-grid="ttt"] > button[data-cell] { border-radius: var(--y-radius); font-family: var(--y-font-serif); font-size: clamp(2.5rem, 12vw, 4rem); }
+[data-grid="ttt"] > button[data-cell][data-mark="X"] { color: var(--y-accent); }
+[data-grid="ttt"] > button[data-cell][data-mark="O"] { color: var(--y-pink); }
+[data-grid="ttt"] > button[data-cell][data-win] { background: var(--y-highlight); }
+
+/* Connect 4: discs in a blue frame */
+[data-board][data-grid="c4"] {
+  grid-template-columns: repeat(7, 1fr); gap: 0.35rem; max-width: 24rem; padding: 0.5rem;
+  border-radius: var(--y-radius); background: var(--y-blue);
+}
+body[data-role="display"] [data-board][data-grid="c4"] { max-width: 34rem; }
+[data-grid="c4"] > button[data-cell] { border-radius: 50%; background: var(--y-bg); transition: background 0.15s; }
+[data-duel][data-my-turn="yes"] [data-grid="c4"] > button[data-cell]:not(:disabled):hover { background: var(--y-fill-hover); }
+[data-grid="c4"] > button[data-cell][data-disc="R"] { background: var(--y-red); }
+[data-grid="c4"] > button[data-cell][data-disc="Y"] { background: var(--y-yellow); }
+[data-grid="c4"] > button[data-cell][data-last] { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--y-bg) 60%, transparent); }
+[data-grid="c4"] > button[data-cell][data-win] { box-shadow: inset 0 0 0 4px var(--y-bg), 0 0 0 3px var(--y-ink); }
+
+/* Hangman */
+[data-hangman] hgroup { margin: 0 0 1rem; text-align: center; }
+[data-hangman] hgroup p { margin: 0.25rem 0 0; }
+[data-hangman][data-my-turn="yes"] [data-headline] { color: var(--y-accent); }
+[data-hangman] svg[data-gallows] { display: block; width: min(11rem, 50%); margin: 0 auto 1rem; stroke: var(--y-text); fill: none; stroke-width: 4; stroke-linecap: round; }
+body[data-role="display"] [data-hangman] svg[data-gallows] { width: min(16rem, 60%); }
+[data-hangman] svg [data-part] { visibility: hidden; }
+[data-hangman] svg [data-part][data-shown] { visibility: visible; }
+[data-hangman][data-result="hanged"] svg [data-part] { stroke: var(--y-danger); }
+[data-word] { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin: 0 0 1rem; font-family: var(--y-font-mono); font-size: clamp(1.5rem, 7vw, 2.5rem); }
+[data-word] > span { min-width: 1.1em; text-align: center; border-bottom: 3px solid var(--y-stroke-strong); line-height: 1.2; }
+[data-word] > span[data-missed] { color: var(--y-danger); }
+[data-keys] { display: grid; grid-template-columns: repeat(auto-fill, minmax(2.4rem, 1fr)); gap: 0.35rem; max-width: 26rem; margin: 0 auto; }
+[data-keys] > button[data-key] { padding: 0; height: 2.6rem; min-width: 0; letter-spacing: 0; font-family: var(--y-font-mono); color: var(--y-text); background: var(--y-fill); }
+[data-keys] > button[data-key][data-hit] { color: var(--y-on-accent); background: var(--y-success); opacity: 1; }
+[data-keys] > button[data-key][data-miss] { color: var(--y-text-3); background: var(--y-fill-subtle); text-decoration: line-through; opacity: 1; }
+[data-hangman] form { display: flex; gap: 0.5rem; max-width: 26rem; margin: 1rem auto 0; }
+[data-hangman] form input { flex: 1; font-family: var(--y-font-mono); text-transform: uppercase; }
+[data-hangman] [data-start], [data-hangman] [data-secret] { text-align: center; }
+[data-hangman] [data-secret] strong { font-family: var(--y-font-mono); letter-spacing: 0.15em; }
+
+
+/* ---- Site pages (home, docs) ---- */
+form[data-hero-join] { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.5rem; margin: 1.5rem auto 0; max-width: 24rem; }
+form[data-hero-join] label { width: 100%; text-align: center; margin: 0; }
+form[data-hero-join] input { flex: 1; min-width: 0; margin: 0; font-family: var(--y-font-mono); text-transform: uppercase; letter-spacing: 0.3em; text-align: center; }
+form[data-hero-join] button { margin: 0; }
+main pre { overflow-x: auto; max-width: 100%; }
+main pre code { white-space: pre; }
+[data-page] main article:has(table) { overflow-x: auto; }
+[data-page="home"] table { min-width: 34rem; }
+[data-page="docs"] table { display: block; overflow-x: auto; max-width: 100%; }
+nav[data-themes] ul, body > header > nav ul { flex-wrap: wrap; justify-content: center; }
+[data-page="home"] #numbers article h3 { font-size: clamp(2rem, 6vw, 3rem); margin: 0 0 0.25rem; }
+[data-page="docs"] main > section { max-width: 46rem; margin-inline: auto; }
+[data-page="docs"] main > section h2 { scroll-margin-top: 1rem; }
+nav[data-toc] { max-width: 46rem; margin: 0 auto var(--y-inset); }
+nav[data-toc] ul { flex-wrap: wrap; justify-content: center; }
+dl dt { font-weight: 600; margin-top: 0.75rem; }
+dl dd { margin-inline-start: 0; }
+:where(p, li, dd, td) > code { overflow-wrap: anywhere; }

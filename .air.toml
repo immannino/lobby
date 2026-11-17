@@ -4,16 +4,16 @@ tmp_dir = "tmp"
 
 [build]
   bin = "tmp/out"
-  cmd = "go build -o ./tmp/out ."
+  cmd = "go build -o ./tmp/out ./examples/site"
   delay = 1000
-  exclude_dir = ["assets", "tmp", "vendor", "testdata"]
+  exclude_dir = ["assets", "tmp", "vendor", "testdata", "_legacy"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
   follow_symlink = false
   full_bin = ""
   include_dir = []
-  include_ext = ["go", "tpl", "tmpl", "html"]
+  include_ext = ["go", "html", "css", "js"]
   kill_delay = "0s"
   log = "build-errors.log"
   send_interrupt = false

@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Lobby Room</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/immannino/yearn.css@0.1.0/dist/yearn.min.css">
+  <script src="/static/theme.js"></script>
+  <link rel="stylesheet" href="/static/demo.css">
+</head>
+<body>
+<aside id="banner" role="status" hidden></aside>
+<main data-mounted><p>Connecting…</p></main>
+
+<dialog id="confirm">
+  <form method="dialog">
+    <p data-message></p>
+    <div>
+      <button value="ok" data-ok>OK</button>
+      <button value="cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Big screen: hero with the code; the game adds cards before Players -->
+<template id="display-view">
+  <header>
+    <hgroup>
+      <p>Join at <b data-join-url></b> with code</p>
+      <h1 data-code></h1>
+      <p data-status></p>
+    </hgroup>
+  </header>
+  <main>
+    <section data-cards>
+      <article data-players-card>
+        <h2>Players <output data-player-count>0</output></h2>
+        <ul data-players></ul>
+      </article>
+    </section>
+  </main>
+</template>
+
+<!-- Phone: compact top bar; the game adds cards before Players -->
+<template id="player-view">
+  <nav aria-label="Room">
+    <strong data-code></strong>
+    <span><span data-you></span> <mark data-vip-tag hidden>VIP</mark></span>
+    <button data-leave>Leave</button>
+  </nav>
+  <main>
+    <section data-cards>
+      <article data-players-card>
+        <h2>Players <output data-player-count>0</output></h2>
+        <ul data-players></ul>
+        <footer data-vip-controls hidden>
+          <label><input type="checkbox" role="switch" data-lock> Lock room (stop new players joining)</label>
+        </footer>
+      </article>
+    </section>
+  </main>
+</template>
+
+<script type="module">
+  import { connect } from "/api/client.js";
+
+  // Each game ships its own browser module, served at /static/games/<kind>.js.
+  const loadGame = (kind) => import(`/static/games/${encodeURIComponent(kind)}.js`);
+
+  const code = location.pathname.split("/").pop().toUpperCase();
+  // yearn styles body > header / body > nav, so views mount directly into <body>.
+  const banner = document.getElementById("banner");
+  const dialog = document.getElementById("confirm");
+  const $ = (sel) => document.querySelector(sel);
+  const el = (tag, props = {}, ...children) => {
+    const e = Object.assign(document.createElement(tag), props);
+    e.append(...children);
+    return e;
+  };
+  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  let you = null;    // our Client, from lobby.welcome
+  let state = null;  // latest lobby.state
+  let game = null;   // the mounted game module's handlers
+  let pending = [];  // game messages that arrived while its module was loading
+  let bannerTimer;
+
+  function showBanner(text, ms) {
+    clearTimeout(bannerTimer);
+    banner.textContent = text;
+    banner.hidden = false;
+    if (ms) bannerTimer = setTimeout(() => (banner.hidden = true), ms);
+  }
+
+  function confirmDialog(message, ok = "OK") {
+    dialog.querySelector("[data-message]").textContent = message;
+    dialog.querySelector("[data-ok]").textContent = ok;
+    dialog.returnValue = "";
+    dialog.showModal();
+    return new Promise((resolve) => dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok"), { once: true }));
+  }
+
+  const room = connect("/api", code, {
+    onStatus(status, detail) {
+      if (status === "open") {
+        banner.hidden = true;
+      } else if (status === "reconnecting") {
+        showBanner("Connection lost, reconnecting…");
+      } else if (status === "closed") {
+        const why = detail.code === 4401 ? "You're not in that room (or your seat expired)." : `Disconnected: ${detail.reason}.`;
+        location.href = `/play?code=${detail.code === 4401 ? code : ""}&msg=${encodeURIComponent(why)}`;
+      }
+    },
+    onMessage({ type, data }) {
+      switch (type) {
+        case "lobby.welcome":
+          if (!you || you.role !== data.you.role) mount(data.you.role, data.game);
+          you = data.you;
+          render();
+          break;
+        case "lobby.state":
+          state = data;
+          render();
+          break;
+        case "lobby.error":
+        case "error":
+          showBanner(capitalize(data.error), 4000);
+          break;
+        default:
+          if (game) game.onMessage?.(type, data);
+          else pending.push([type, data]);
+      }
+    },
+  });
+
+  async function mount(role, kind) {
+    game = null;
+    const tpl = document.getElementById(role === "display" ? "display-view" : "player-view");
+    document.body.dataset.role = role;
+    document.body.dataset.game = kind || "chat";
+    for (const node of document.querySelectorAll("body > [data-mounted]")) node.remove();
+    const view = tpl.content.cloneNode(true);
+    for (const node of view.children) node.dataset.mounted = "";
+    dialog.before(view);
+
+    if (role === "display") {
+      $("[data-join-url]").textContent = location.host;
+    } else {
+      $("[data-leave]").onclick = async () => {
+        if (await confirmDialog("Leave this room? You'll need the code to get back in.", "Leave")) room.leave();
+      };
+      $("[data-lock]").onchange = (ev) => room.lock(ev.target.checked);
+    }
+
+    let module;
+    try {
+      module = await loadGame(kind || "chat");
+    } catch (err) {
+      showBanner(`Couldn't load the ${kind} game.`);
+      throw err;
+    }
+    game = module.mount({
+      role,
+      room,
+      el,
+      confirm: confirmDialog,
+      cards: $("[data-cards]"),
+      before: $("[data-players-card]"),
+      you: () => you,
+      state: () => state,
+      rerender: () => render(),
+    });
+    for (const [type, data] of pending) game.onMessage?.(type, data);
+    pending = [];
+    render();
+  }
+
+  function render() {
+    if (!you) return;
+    $("[data-code]").textContent = code;
+    if (!state) return;
+
+    const isVIP = state.vip === you.id;
+    const players = state.clients.filter((c) => c.role === "player");
+    $("[data-player-count]").textContent = players.length;
+
+    if (you.role === "display") {
+      $("[data-status]").textContent =
+        game?.status?.() ??
+        (state.locked ? "Room locked: game in progress" : players.length ? "Waiting for players…" : "Grab your phone and join!");
+    } else {
+      $("[data-you]").textContent = you.name;
+      $("[data-vip-tag]").hidden = !isVIP;
+      $("[data-vip-controls]").hidden = !isVIP;
+      $("[data-lock]").checked = state.locked;
+    }
+
+    $("[data-players]").replaceChildren(
+      ...players.map((p) => {
+        const dot = el("span", { title: p.connected ? "connected" : "reconnecting" });
+        dot.dataset.dot = p.connected ? "on" : "off";
+        const li = el("li", {}, dot, el("span", { textContent: p.name + (p.id === you.id ? " (you)" : "") }));
+        if (p.id === state.vip) li.append(el("mark", { textContent: "VIP" }));
+        game?.decoratePlayer?.(li, p);
+        if (isVIP && p.id !== you.id) {
+          const kick = el("button", { textContent: "Kick" });
+          kick.dataset.kick = "";
+          kick.onclick = async () => {
+            if (await confirmDialog(`Kick ${p.name} from the room?`, "Kick")) room.kick(p.id);
+          };
+          li.append(kick);
+        }
+        return li;
+      }),
+    );
+    game?.onState?.(state);
+  }
+</script>
+</body>
+</html>
