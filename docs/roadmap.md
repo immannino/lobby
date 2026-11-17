@@ -44,11 +44,9 @@ Gaps, roughly by priority:
 ## 2. Site: marketing + get started + live demo
 
 **Done:** `examples/site` serves `/` (landing), `/docs`, `/play` and
-`/healthz`, and deploys to Railway from the root `Dockerfile`. The original
-recommendation:
+`/healthz`. The original recommendation:
 
-**one Go binary that is the site and the demo**, deployed
-to a single Fly.io (or Railway) machine with a volume for `lobby.db`.
+**one Go binary that is the site and the demo**.
 Dogfooding is the pitch: "this page is running on the library."
 
 - `/`: a hero with a live room code you can join from your phone right now
