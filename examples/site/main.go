@@ -30,6 +30,7 @@ import (
 	"github.com/immannino/lobby/examples/games/connect4"
 	"github.com/immannino/lobby/examples/games/duel"
 	"github.com/immannino/lobby/examples/games/hangman"
+	"github.com/immannino/lobby/examples/games/poll"
 	"github.com/immannino/lobby/examples/games/tictactoe"
 	"github.com/immannino/lobby/sqlitestore"
 )
@@ -98,6 +99,8 @@ func games(ctx context.Context, m func() *lobby.Manager, log *slog.Logger) []gam
 			new: func(string) lobby.Game { return connect4.New(bot(connect4.Brain)) }, js: connect4.ClientJS},
 		{Name: hangman.Name, Title: "Hangman", Blurb: "Take turns setting a secret word for everyone else.",
 			new: func(string) lobby.Game { return hangman.New(hangman.Options{}) }, js: hangman.ClientJS},
+		{Name: poll.Name, Title: "Quick poll", Blurb: "Ask the room a question. Reveal the results, or watch them live.",
+			new: func(string) lobby.Game { return poll.New() }, js: poll.ClientJS},
 		{Name: chat.Name, Title: "Chat & counter", Blurb: "The simplest possible game.",
 			new: func(string) lobby.Game { return chat.New() }, js: chat.ClientJS},
 	}

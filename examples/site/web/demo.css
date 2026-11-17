@@ -132,3 +132,44 @@ body > header [data-invite] { display: flex; flex-wrap: wrap; justify-content: c
 footer[data-invite] { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
 footer[data-invite] > span { flex: 1 0 100%; color: var(--y-text-3); font-size: 0.875rem; }
 footer[data-invite] > button { padding: 0.45rem 0.9rem; font-size: 0.7rem; }
+
+/* Poll */
+[data-poll] hgroup { margin: 0 0 1.25rem; text-align: center; }
+[data-poll] hgroup p { margin: 0.25rem 0 0; }
+[data-poll] ol[data-options] { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.6rem; }
+[data-poll] ol[data-options] > li { margin: 0; padding: 0; }
+[data-poll] [data-option]:not([hidden]) {
+  position: relative; display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+  width: 100%; min-height: 3.25rem; padding: 0.75rem 1.1rem; overflow: hidden; isolation: isolate;
+  border-radius: var(--y-radius); text-align: start; letter-spacing: 0; text-transform: none;
+  font-family: var(--y-font-sans); font-size: 1rem; color: var(--y-text); background: var(--y-fill);
+}
+/* The bar: a pseudo-element sized by --pct, behind the text. */
+[data-poll] [data-option]:not([hidden])::before {
+  content: ""; position: absolute; inset: 0 auto 0 0; width: var(--pct, 0%); z-index: -1;
+  background: color-mix(in srgb, var(--y-accent) 22%, transparent); transition: width 0.5s var(--y-ease, ease);
+}
+[data-poll] [data-option]:not([hidden])[data-leading]::before { background: color-mix(in srgb, var(--y-accent) 38%, transparent); }
+[data-poll] [data-option]:not([hidden])[data-mine] { box-shadow: inset 0 0 0 2px var(--y-accent); }
+[data-poll] [data-option]:not([hidden]):disabled { opacity: 1; cursor: default; }
+[data-poll][data-phase="open"] button[data-option]:not([hidden]):hover { background: var(--y-fill-hover); }
+[data-poll] [data-count] { font-family: var(--y-font-mono); font-size: 0.85rem; color: var(--y-text-3); white-space: nowrap; }
+[data-poll] [data-host-actions] { text-align: center; margin: 1.25rem 0 0; }
+body[data-role="display"] [data-poll] [data-option]:not([hidden]) { min-height: 4.5rem; font-size: 1.5rem; }
+body[data-role="display"] [data-poll] [data-count] { font-size: 1.1rem; }
+[data-composer] fieldset { display: grid; gap: 0.5rem; border: 0; padding: 0; margin: 1rem 0 0.5rem; }
+[data-composer] fieldset legend { padding: 0; margin-bottom: 0.25rem; }
+[data-composer] fieldset input { margin: 0; }
+[data-past] details { margin: 0.5rem 0; }
+[data-past] details ul { margin: 0.5rem 0 0; }
+
+/* Recent rooms (play page) */
+[data-recent-list] { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.5rem; }
+[data-recent-list] > li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; margin: 0; padding: 0.5rem 0; border-bottom: 1px solid var(--y-stroke); }
+[data-recent-list] > li:last-child { border-bottom: 0; }
+[data-recent-list] [data-code] { font-size: 1.1rem; }
+[data-recent-list] [data-meta] { flex: 1 1 12rem; color: var(--y-text-3); font-size: 0.875rem; }
+[data-recent-list] > li > button { padding: 0.45rem 0.9rem; font-size: 0.7rem; }
+[data-recent-list] > li[data-ended] { opacity: 0.55; }
+[data-recent] footer button { padding: 0.4rem 0.8rem; font-size: 0.65rem; color: var(--y-text); background: var(--y-fill); }
+[data-composer] [data-add-option]:not([hidden]) { color: var(--y-text); background: var(--y-fill); }

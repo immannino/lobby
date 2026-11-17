@@ -77,6 +77,7 @@
 
 <script type="module">
   import { connect } from "/api/client.js";
+  import * as history from "/static/history.js";
 
   // Each game ships its own browser module, served at /static/games/<kind>.js.
   const loadGame = (kind) => import(`/static/games/${encodeURIComponent(kind)}.js`);
@@ -121,6 +122,13 @@
       } else if (status === "reconnecting") {
         showBanner("Connection lost, reconnecting…");
       } else if (status === "closed") {
+        if (detail.code === 4401 && history.find(code)) {
+          // Seat expired (or cookie gone) but we've been here: rejoin.
+          location.href = `/play?code=${code}&rejoin=1`;
+          return;
+        }
+        // Left, kicked or room over: drop it from "recent rooms".
+        if ([1000, 4403, 4404, 4410].includes(detail.code)) history.forget(code);
         const why = detail.code === 4401 ? "You're not in that room (or your seat expired)." : `Disconnected: ${detail.reason}.`;
         location.href = `/play?code=${detail.code === 4401 ? code : ""}&msg=${encodeURIComponent(why)}`;
       }
@@ -130,6 +138,7 @@
         case "lobby.welcome":
           if (!you || you.role !== data.you.role) mount(data.you.role, data.game);
           you = data.you;
+          history.remember({ code, game: data.game, role: data.you.role, name: data.you.name });
           render();
           break;
         case "lobby.state":
